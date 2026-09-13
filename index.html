@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vamsi's Food Log</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0f1419; --card:#1a2230; --text:#e8edf3; --muted:#8b98a9; --accent:#4caf7d; --warn:#e0a83e; --bad:#e05c5c; --blue:#5aa9e6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); padding:16px; max-width:720px; margin:0 auto; }
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  h1 { font-size:1.4rem; }
+  .refresh-btn { background:var(--card); color:var(--text); border:1px solid #2c3a4f; border-radius:8px; padding:8px 14px; font-size:0.9rem; cursor:pointer; }
+  .refresh-btn:active { transform:scale(0.96); }
+  .updated { font-size:0.75rem; color:var(--muted); margin-bottom:12px; }
+  .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .card h2 { font-size:1.05rem; margin-bottom:10px; }
+  .weight-big { font-size:2.2rem; font-weight:700; }
+  .weight-sub { color:var(--muted); font-size:0.9rem; margin-top:4px; }
+  .progress { height:10px; background:#2c3a4f; border-radius:5px; margin-top:10px; overflow:hidden; }
+  .progress > div { height:100%; background:linear-gradient(90deg,var(--accent),var(--blue)); border-radius:5px; transition:width .5s; }
+  .meal { border-bottom:1px solid #2c3a4f; padding:10px 0; }
+  .meal:last-child { border-bottom:none; }
+  .meal-head { display:flex; justify-content:space-between; align-items:baseline; }
+  .meal-name { font-weight:600; }
+  .meal-time { color:var(--muted); font-size:0.8rem; }
+  .meal-items { font-size:0.9rem; margin:4px 0; color:#c9d4e0; }
+  .macros { display:flex; gap:8px; flex-wrap:wrap; font-size:0.8rem; margin-top:6px; }
+  .chip { background:#2c3a4f; border-radius:6px; padding:3px 8px; }
+  .chip.kcal { background:#3a2f1a; color:#f0c96a; font-weight:600; }
+  .meal-notes { font-size:0.8rem; color:var(--muted); margin-top:4px; font-style:italic; }
+  .day-picker { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .day-btn { background:#2c3a4f; color:var(--text); border:none; border-radius:8px; padding:6px 12px; font-size:0.85rem; cursor:pointer; }
+  .day-btn.active { background:var(--blue); color:#0f1419; font-weight:600; }
+  .status { font-size:0.8rem; font-weight:600; padding:2px 8px; border-radius:6px; }
+  .status.deficit { background:#1d3a2a; color:#7de0a3; }
+  .status.surplus { background:#3a231d; color:#f0a07d; }
+  .empty, .loading, .error { text-align:center; color:var(--muted); padding:24px 12px; font-size:0.95rem; }
+  .error { color:#f0a07d; }
+  .error button { margin-top:10px; }
+  .legend { display:flex; gap:12px; font-size:0.8rem; color:var(--muted); margin-top:8px; flex-wrap:wrap; }
+  .legend span i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
+  canvas { max-height:260px; }
+  footer { text-align:center; color:var(--muted); font-size:0.75rem; margin:24px 0 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍽️ Vamsi's Food Log</h1>
+  <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
+</header>
+<div class="updated" id="updatedAt">Loading…</div>
+<div id="errorBanner"></div>
+
+<div class="card" id="weightCard">
+  <h2>Weight</h2>
+  <div id="weightBody"><div class="loading">Loading…</div></div>
+</div>
+
+<div class="card">
+  <h2>Today's meals <span id="todayDate" style="color:var(--muted);font-weight:400;font-size:0.85rem;"></span></h2>
+  <div id="mealsBody"><div class="loading">Loading…</div></div>
+</div>
+
+<div class="card">
+  <h2>Daily calories vs target</h2>
+  <div style="position:relative;"><canvas id="calChart"></canvas></div>
+  <div class="legend">
+    <span><i style="background:#5aa9e6"></i>Calories eaten</span>
+    <span><i style="background:#e0a83e"></i>Target band (2100–2300)</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Macros (P / C / F)</h2>
+  <div class="day-picker" id="dayPicker"></div>
+  <div style="position:relative;max-width:320px;margin:0 auto;"><canvas id="macroChart"></canvas></div>
+  <div id="macroTotals" style="text-align:center;margin-top:8px;font-size:0.9rem;color:var(--muted);"></div>
+</div>
+
+<div class="card">
+  <h2>Weight trend</h2>
+  <div style="position:relative;"><canvas id="weightChart"></canvas></div>
+</div>
+
+<footer>Auto-refreshes every 15 min · Data from Google Sheet</footer>
+
+<script>
+const SHEET_ID = "1qLlbE0ehY8bNAJ-ocmxHFhRSFdZ-l9j27B6-zZXU0es";
+const GOAL_KG = 80;
+const DEFAULT_TARGET = [2100, 2300];
+const TZ = "America/New_York";
+
+let charts = {};
+
+function todayStr() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TZ }); // yyyy-mm-dd
+}
+function fmtDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function cell(row, i) {
+  const c = row.c[i];
+  if (!c) return null;
+  return c.f !== undefined && c.f !== null && c.f !== "" ? c.f : c.v;
+}
+function num(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+async function gviz(sheet) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(sheet)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Sheet fetch failed (" + res.status + ")");
+  const text = await res.text();
+  const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+  if (json.status !== "ok") throw new Error("Sheet query error");
+  return json.table;
+}
+
+function parseMeals(table) {
+  const out = [];
+  for (const row of table.rows || []) {
+    const dateRaw = cell(row, 0);
+    if (!dateRaw) continue;
+    let date = String(dateRaw);
+    const m = date.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (m) date = `${m[1]}-${String(+m[2] + 1).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    out.push({
+      date,
+      meal: cell(row, 1) || "Meal",
+      time: cell(row, 2) || "",
+      items: cell(row, 3) || "",
+      kcal: num(cell(row, 4)),
+      protein: num(cell(row, 5)),
+      carbs: num(cell(row, 6)),
+      fat: num(cell(row, 7)),
+      photo: String(cell(row, 8) || "").toLowerCase() === "yes",
+      notes: cell(row, 9) || ""
+    });
+  }
+  return out;
+}
+
+function parseDaily(table) {
+  const out = [];
+  for (const row of table.rows || []) {
+    const date = cell(row, 0);
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) continue;
+    out.push({
+      date: String(date),
+      kcal: num(cell(row, 1)),
+      target: cell(row, 2) || "2100-2300",
+      status: cell(row, 3) || "",
+      weight: num(cell(row, 4)),
+      notes: cell(row, 5) || ""
+    });
+  }
+  out.sort((a, b) => a.date.localeCompare(b.date));
+  return out;
+}
+
+function parseTarget(s) {
+  const m = String(s || "").match(/(\d+)\s*[-–]\s*(\d+)/);
+  return m ? [+m[1], +m[2]] : DEFAULT_TARGET.slice();
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderWeight(daily) {
+  const body = document.getElementById("weightBody");
+  const weighed = daily.filter(d => d.weight != null);
+  if (!weighed.length) { body.innerHTML = '<div class="empty">No weight logged yet.</div>'; return; }
+  const latest = weighed[weighed.length - 1];
+  const baseline = weighed[0].weight;
+  const toGo = Math.max(0, latest.weight - GOAL_KG);
+  const pct = baseline > GOAL_KG ? Math.min(100, Math.max(0, (baseline - latest.weight) / (baseline - GOAL_KG) * 100)) : 0;
+  body.innerHTML = `
+    <div class="weight-big">${latest.weight} kg</div>
+    <div class="weight-sub">Goal: ${GOAL_KG} kg · <strong style="color:var(--text)">${toGo.toFixed(1)} kg to go</strong> · weighed ${fmtDate(latest.date)}</div>
+    <div class="progress"><div style="width:${pct.toFixed(1)}%"></div></div>`;
+
+  // trend chart
+  destroyChart("weightChart");
+  const labels = weighed.map(d => fmtDate(d.date));
+  const data = weighed.map(d => d.weight);
+  if (window.Chart) {
+    charts.weightChart = new Chart(document.getElementById("weightChart"), {
+      type: "line",
+      data: { labels, datasets: [
+        { label: "Weight (kg)", data, borderColor: "#5aa9e6", backgroundColor: "rgba(90,169,230,.15)", fill: true, tension: 0.3, pointRadius: 4 },
+        { label: "Goal", data: labels.map(() => GOAL_KG), borderColor: "#4caf7d", borderDash: [6, 4], pointRadius: 0, fill: false }
+      ]},
+      options: { plugins: { legend: { labels: { color: "#8b98a9", boxWidth: 12 } } },
+        scales: { x: { ticks: { color: "#8b98a9" } }, y: { ticks: { color: "#8b98a9" } } } }
+    });
+  }
+}
+
+function renderMeals(meals) {
+  const body = document.getElementById("mealsBody");
+  const t = todayStr();
+  document.getElementById("todayDate").textContent = "· " + new Date().toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "short", day: "numeric" });
+  const todays = meals.filter(m => m.date === t);
+  if (!todays.length) {
+    const latest = meals.length ? meals[meals.length - 1].date : null;
+    body.innerHTML = `<div class="empty">No meals logged yet today.${latest ? ` Last logged: ${fmtDate(latest)}.` : ""}</div>`;
+    return;
+  }
+  body.innerHTML = todays.map(m => `
+    <div class="meal">
+      <div class="meal-head"><span class="meal-name">${esc(m.meal)}${m.photo ? " 📷" : ""}</span><span class="meal-time">${esc(m.time)}</span></div>
+      <div class="meal-items">${esc(m.items)}</div>
+      <div class="macros">
+        ${m.kcal != null ? `<span class="chip kcal">${m.kcal} kcal</span>` : ""}
+        ${m.protein != null ? `<span class="chip">P ${m.protein}g</span>` : ""}
+        ${m.carbs != null ? `<span class="chip">C ${m.carbs}g</span>` : ""}
+        ${m.fat != null ? `<span class="chip">F ${m.fat}g</span>` : ""}
+      </div>
+      ${m.notes ? `<div class="meal-notes">${esc(m.notes)}</div>` : ""}
+    </div>`).join("");
+}
+
+function renderCalChart(daily) {
+  destroyChart("calChart");
+  const recent = daily.slice(-14);
+  const labels = recent.map(d => fmtDate(d.date));
+  const kcal = recent.map(d => d.kcal);
+  const t0 = recent.length ? parseTarget(recent[recent.length - 1].target) : DEFAULT_TARGET;
+  const colors = recent.map(d => (d.status || "").toLowerCase() === "surplus" ? "#e0a83e" : "#4caf7d");
+  if (!window.Chart || !recent.length) return;
+  charts.calChart = new Chart(document.getElementById("calChart"), {
+    type: "bar",
+    data: { labels, datasets: [
+      { label: "kcal", data: kcal, backgroundColor: colors, borderRadius: 4 },
+      { label: "Target low", data: labels.map(() => t0[0]), type: "line", borderColor: "#e0a83e", borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 },
+      { label: "Target high", data: labels.map(() => t0[1]), type: "line", borderColor: "#e0a83e", borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 }
+    ]},
+    options: { plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: "#8b98a9" } }, y: { ticks: { color: "#8b98a9" }, beginAtZero: true } } }
+  });
+}
+
+let macroDay = null;
+function dailyMacros(meals) {
+  const byDay = {};
+  for (const m of meals) {
+    (byDay[m.date] = byDay[m.date] || { p: 0, c: 0, f: 0, kcal: 0, n: 0 });
+    if (m.protein != null) byDay[m.date].p += m.protein;
+    if (m.carbs != null) byDay[m.date].c += m.carbs;
+    if (m.fat != null) byDay[m.date].f += m.fat;
+    if (m.kcal != null) byDay[m.date].kcal += m.kcal;
+    byDay[m.date].n++;
+  }
+  return byDay;
+}
+
+function renderMacros(meals) {
+  const byDay = dailyMacros(meals);
+  const days = Object.keys(byDay).sort().slice(-7);
+  const picker = document.getElementById("dayPicker");
+  if (!days.length) {
+    picker.innerHTML = "";
+    document.getElementById("macroTotals").textContent = "No macro data yet.";
+    destroyChart("macroChart");
+    return;
+  }
+  if (!macroDay || !byDay[macroDay]) macroDay = days[days.length - 1];
+  picker.innerHTML = days.map(d =>
+    `<button class="day-btn${d === macroDay ? " active" : ""}" onclick="macroDay='${d}';renderMacros(window._meals)">${fmtDate(d)}</button>`).join("");
+  const t = byDay[macroDay];
+  document.getElementById("macroTotals").textContent =
+    `P ${Math.round(t.p)}g · C ${Math.round(t.c)}g · F ${Math.round(t.f)}g · ${Math.round(t.kcal)} kcal`;
+  destroyChart("macroChart");
+  if (window.Chart) {
+    charts.macroChart = new Chart(document.getElementById("macroChart"), {
+      type: "doughnut",
+      data: { labels: ["Protein", "Carbs", "Fat"],
+        datasets: [{ data: [t.p, t.c, t.f], backgroundColor: ["#5aa9e6", "#e0a83e", "#e05c5c"], borderWidth: 0 }] },
+      options: { plugins: { legend: { position: "bottom", labels: { color: "#8b98a9", boxWidth: 12 } } }, cutout: "60%" }
+    });
+  }
+}
+
+function showError(msg) {
+  document.getElementById("errorBanner").innerHTML =
+    `<div class="card error">⚠️ ${esc(msg)}<br><button class="refresh-btn" onclick="loadAll()">Try again</button></div>`;
+}
+function clearError() { document.getElementById("errorBanner").innerHTML = ""; }
+
+async function loadAll() {
+  clearError();
+  const btn = document.getElementById("refreshBtn");
+  btn.textContent = "⟳ …";
+  try {
+    const [mealsTable, dailyTable] = await Promise.all([gviz("Meals"), gviz("Daily summary")]);
+    const meals = parseMeals(mealsTable);
+    const daily = parseDaily(dailyTable);
+    window._meals = meals;
+    renderWeight(daily);
+    renderMeals(meals);
+    renderCalChart(daily);
+    renderMacros(meals);
+    const now = new Date().toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    document.getElementById("updatedAt").textContent = "Last updated: " + now + " ET";
+  } catch (e) {
+    console.error(e);
+    showError("Couldn't load the food log. Check your connection and try again.");
+    document.getElementById("updatedAt").textContent = "Last update failed — showing nothing cached.";
+  }
+  btn.textContent = "↻ Refresh";
+}
+
+loadAll();
+setInterval(loadAll, 15 * 60 * 1000);
+</script>
+</body>
+</html>
