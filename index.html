@@ -1,328 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vamsi's Food Log</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-  :root { --bg:#0f1419; --card:#1a2230; --text:#e8edf3; --muted:#8b98a9; --accent:#4caf7d; --warn:#e0a83e; --bad:#e05c5c; --blue:#5aa9e6; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); padding:16px; max-width:720px; margin:0 auto; }
-  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  h1 { font-size:1.4rem; }
-  .refresh-btn { background:var(--card); color:var(--text); border:1px solid #2c3a4f; border-radius:8px; padding:8px 14px; font-size:0.9rem; cursor:pointer; }
-  .refresh-btn:active { transform:scale(0.96); }
-  .updated { font-size:0.75rem; color:var(--muted); margin-bottom:12px; }
-  .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:16px; }
-  .card h2 { font-size:1.05rem; margin-bottom:10px; }
-  .weight-big { font-size:2.2rem; font-weight:700; }
-  .weight-sub { color:var(--muted); font-size:0.9rem; margin-top:4px; }
-  .progress { height:10px; background:#2c3a4f; border-radius:5px; margin-top:10px; overflow:hidden; }
-  .progress > div { height:100%; background:linear-gradient(90deg,var(--accent),var(--blue)); border-radius:5px; transition:width .5s; }
-  .meal { border-bottom:1px solid #2c3a4f; padding:10px 0; }
-  .meal:last-child { border-bottom:none; }
-  .meal-head { display:flex; justify-content:space-between; align-items:baseline; }
-  .meal-name { font-weight:600; }
-  .meal-time { color:var(--muted); font-size:0.8rem; }
-  .meal-items { font-size:0.9rem; margin:4px 0; color:#c9d4e0; }
-  .macros { display:flex; gap:8px; flex-wrap:wrap; font-size:0.8rem; margin-top:6px; }
-  .chip { background:#2c3a4f; border-radius:6px; padding:3px 8px; }
-  .chip.kcal { background:#3a2f1a; color:#f0c96a; font-weight:600; }
-  .meal-notes { font-size:0.8rem; color:var(--muted); margin-top:4px; font-style:italic; }
-  .day-picker { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-  .day-btn { background:#2c3a4f; color:var(--text); border:none; border-radius:8px; padding:6px 12px; font-size:0.85rem; cursor:pointer; }
-  .day-btn.active { background:var(--blue); color:#0f1419; font-weight:600; }
-  .status { font-size:0.8rem; font-weight:600; padding:2px 8px; border-radius:6px; }
-  .status.deficit { background:#1d3a2a; color:#7de0a3; }
-  .status.surplus { background:#3a231d; color:#f0a07d; }
-  .empty, .loading, .error { text-align:center; color:var(--muted); padding:24px 12px; font-size:0.95rem; }
-  .error { color:#f0a07d; }
-  .error button { margin-top:10px; }
-  .legend { display:flex; gap:12px; font-size:0.8rem; color:var(--muted); margin-top:8px; flex-wrap:wrap; }
-  .legend span i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
-  canvas { max-height:260px; }
-  footer { text-align:center; color:var(--muted); font-size:0.75rem; margin:24px 0 12px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183d33">
+  <meta name="description" content="Vamsi's personal nutrition workspace. A clearer view of daily goals, food patterns, and progress.">
+  <title>Nouri — Vamsi's health, in focus</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23183d33'/%3E%3Cpath d='M17 37C17 22 29 16 45 17C47 34 35 45 20 43M20 43L38 25' fill='none' stroke='%23dcf4ab' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="nutrition.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-<header>
-  <h1>🍽️ Vamsi's Food Log</h1>
-  <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
-</header>
-<div class="updated" id="updatedAt">Loading…</div>
-<div id="errorBanner"></div>
-
-<div class="card" id="weightCard">
-  <h2>Weight</h2>
-  <div id="weightBody"><div class="loading">Loading…</div></div>
-</div>
-
-<div class="card">
-  <h2>Today's meals <span id="todayDate" style="color:var(--muted);font-weight:400;font-size:0.85rem;"></span></h2>
-  <div id="mealsBody"><div class="loading">Loading…</div></div>
-</div>
-
-<div class="card">
-  <h2>Daily calories vs target</h2>
-  <div style="position:relative;"><canvas id="calChart"></canvas></div>
-  <div class="legend">
-    <span><i style="background:#5aa9e6"></i>Calories eaten</span>
-    <span><i style="background:#e0a83e"></i>Target band (2100–2300)</span>
+  <a class="skip-link" href="#main">Skip to dashboard</a>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 16C4 8 10 3 20 4c1 10-4 16-12 15M5 21 16 10"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h17M8 15l4-5 4 2 5-7"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 3h13a1 1 0 0 1 1 1v17H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3M3 17h16M8 7h7M8 11h5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM20 2v4m-2-2h4"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M10 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 3M4 16l2 3a8 8 0 0 0 13-3"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18M8 15h1m6 0h1"/></symbol>
+    <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 3c2 5-4 7-2 10 1 1 3 0 3-3 4 3 5 5 5 7a6 6 0 0 1-12 0c-1-5 2-8 6-14Z"/></symbol>
+    <symbol id="i-protein" viewBox="0 0 24 24"><path d="m7 5-3 3 12 12 3-3ZM5 13l-2 2 6 6 2-2M13 5l2-2 6 6-2 2M8 4 5 7M17 17l3 3"/></symbol>
+    <symbol id="i-grain" viewBox="0 0 24 24"><path d="M5 21 19 7M11 15C5 16 3 13 4 9c4-1 7 1 7 6ZM15 11c-1-6 2-8 6-7 1 4-1 7-6 7ZM15 11C9 12 7 9 8 5c4-1 7 1 7 6ZM11 15c-1 6 2 8 6 7 1-4-1-7-6-7Z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3C10 7 5 11 5 15a7 7 0 0 0 14 0c0-4-5-8-7-12ZM9 16a3 3 0 0 0 3 3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M7 9a6 6 0 0 1 10 0l-3 4h-4ZM12 10V7"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0ZM7 21h10M9 3c-3 3 3 3 0 6m6-6c-3 3 3 3 0 6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10Z"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24"><path d="M4 8h12v7a6 6 0 0 1-12 0ZM16 9h2a3 3 0 0 1 0 6h-2M3 22h15M7 2v3m5-3v3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 4-4 8-8 10-4-2-8-6-8-10V6ZM8 12l3 3 5-6"/></symbol>
+  </defs></svg>
+  <aside class="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#overview" aria-label="Nouri home"><span class="brand-mark"><svg class="icon"><use href="#i-leaf"/></svg></span>nouri<span class="brand-dot">.</span></a>
+    <div class="workspace-label">A LITTLE BETTER, EVERY DAY</div>
+    <div class="nav-label">YOUR WORKSPACE</div>
+    <nav class="main-nav">
+      <a href="#overview" class="nav-item active" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Overview</span><span class="nav-active-dot"></span></a>
+      <a href="#patterns" class="nav-item"><svg class="icon"><use href="#i-chart"/></svg><span>Patterns & insights</span></a>
+      <a href="#journal" class="nav-item"><svg class="icon"><use href="#i-book"/></svg><span>Food journal</span></a>
+      <a href="#planner" class="nav-item"><svg class="icon"><use href="#i-spark"/></svg><span>Meal lab</span><span class="mini-new">NEW</span></a>
+      <a href="#progress" class="nav-item"><svg class="icon"><use href="#i-scale"/></svg><span>Weight journey</span></a>
+    </nav>
+    <div class="sidebar-goal">
+      <div class="sidebar-goal-top"><span class="tiny-label">THE LONG GAME</span><svg class="icon"><use href="#i-target"/></svg></div>
+      <div class="sidebar-goal-number"><span id="sideGoal">80</span><span>kg goal</span></div>
+      <div class="side-progress"><span id="sideProgress"></span></div>
+      <p id="sideWeight">Your progress starts here.</p>
+      <a href="#progress">One step at a time <svg class="icon"><use href="#i-arrow"/></svg></a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="nav-item" data-action="settings"><svg class="icon"><use href="#i-settings"/></svg><span>Goals & preferences</span></button>
+      <button class="nav-item" data-action="about"><svg class="icon"><use href="#i-info"/></svg><span>How it works</span></button>
+      <div class="profile"><div class="avatar">VK</div><div><strong>Vamsi Krishna</strong><span>Personal workspace</span></div><span class="profile-dot"></span></div>
+    </div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="breadcrumb"><span>My workspace</span><svg class="icon"><use href="#i-chevron"/></svg><strong id="breadcrumbPage">Overview</strong></div>
+      <a class="mobile-brand" href="#overview">nouri.</a>
+      <div class="topbar-actions"><span class="sync-status" id="syncStatus" role="status"><span class="sync-dot loading-dot"></span>Connecting to your Sheet</span><button id="refreshBtn" class="icon-button" aria-label="Refresh data" title="Refresh data"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="top-avatar" data-action="settings" aria-label="Open your goals">VK</button></div>
+    </header>
+    <main id="main">
+      <section id="overview" class="section-anchor">
+        <div class="page-heading"><div><div class="eyebrow">HELLO, VAMSI <svg class="icon"><use href="#i-sun"/></svg></div><h1>Your health, in focus.</h1><p>Your food. Your goals. A clearer next step.</p></div><a class="button button-primary sheet-link" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-book"/></svg>Log food <svg class="icon small"><use href="#i-out"/></svg></a></div>
+        <div id="connectionBanner" class="connection-banner" hidden role="status"></div>
+        <div class="snapshot-toolbar"><div class="section-title-inline"><h2>Daily snapshot</h2><span class="subtle-pill" id="snapshotLabel">Loading your log</span></div><div class="date-controls"><button id="prevDay" class="icon-button" aria-label="Previous day"><svg class="icon flip"><use href="#i-chevron"/></svg></button><label class="date-field"><svg class="icon"><use href="#i-cal"/></svg><span class="sr-only">Snapshot date</span><input id="datePicker" type="date" required></label><button id="nextDay" class="icon-button" aria-label="Next day"><svg class="icon"><use href="#i-chevron"/></svg></button><button class="button button-small" id="todayBtn">Today</button></div></div>
+        <article class="daily-brief" aria-labelledby="briefHeading">
+          <div class="brief-content"><div class="brief-eyebrow"><span><svg class="icon"><use href="#i-spark"/></svg>YOUR DAILY BRIEF</span><span id="briefDate">YOUR LOG, TRANSLATED</span></div><h2 id="briefHeading">A clearer picture<br><span>starts here.</span></h2><p id="briefText">Bringing your food log and your goals together.</p><div class="brief-footer"><span id="briefMeta">Connected to your Google Sheet</span><a href="#journal">See the breakdown <svg class="icon"><use href="#i-arrow"/></svg></a></div></div>
+          <div class="brief-visual" id="briefVisual" aria-label="Goal progress"></div>
+        </article>
+        <div class="metrics-grid" id="metricsGrid" aria-label="Daily nutrition totals"><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div></div>
+      </section>
+      <section id="patterns" class="section-anchor analytics-grid">
+        <article class="card rhythm-card">
+          <div class="card-header"><div><div class="eyebrow">THE BIGGER PICTURE</div><h2>Your daily rhythm</h2></div><div class="segmented" id="rangeTabs" aria-label="Chart date range"><button data-range="7" class="selected" aria-pressed="true">7D</button><button data-range="14" aria-pressed="false">14D</button><button data-range="30" aria-pressed="false">30D</button></div></div>
+          <div class="chart-toolbar"><div class="chart-stat" id="chartStat">— <span>daily average</span></div><div class="text-tabs" id="metricTabs" aria-label="Chart nutrient"><button data-metric="kcal" class="selected" aria-pressed="true">Calories</button><button data-metric="protein" aria-pressed="false">Protein</button></div></div>
+          <div id="trendChart" class="trend-chart"></div>
+          <div class="chart-legend"><span><i class="legend-dot sage"></i>Logged intake</span><span><i class="legend-dot coral"></i>Above calorie range</span><span><i class="legend-line"></i><span id="targetLegend">Your target range</span></span></div>
+          <p class="chart-caption" id="chartCaption">Unlogged days stay blank.</p>
+          <div class="consistency-grid" id="consistencyGrid"></div>
+          <details class="data-table-details"><summary>View chart data</summary><div id="chartTable" class="table-scroll"></div></details>
+        </article>
+        <article class="card insight-card"><div class="card-header"><div><div class="eyebrow">FROM NUMBERS TO CLARITY</div><h2>Worth your attention</h2></div><span class="icon-tile peach"><svg class="icon"><use href="#i-spark"/></svg></span></div><div id="insightsBody"></div><div class="insight-footer"><svg class="icon"><use href="#i-info"/></svg><span>Based on your food log and your chosen targets.</span></div></article>
+      </section>
+      <section id="journal" class="section-anchor journal-grid">
+        <article class="card journal-card"><div class="card-header"><div><div class="eyebrow" id="journalDate">YOUR FOOD, UP CLOSE</div><h2>On the menu</h2></div><span class="subtle-pill" id="mealCount">— entries</span></div><div class="journal-controls"><label class="search-field"><svg class="icon"><use href="#i-search"/></svg><input type="search" id="mealSearch" placeholder="Find something you ate" aria-label="Search this day's food"></label><label><span class="sr-only">Filter meals</span><select id="mealFilter"><option value="all">All meals</option><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snacks & drinks</option></select></label></div><div id="mealsBody" class="meal-list"></div><div class="journal-footer"><span><span class="small-dot"></span>Food values are estimates</span><a class="sheet-link" target="_blank" rel="noopener noreferrer">Edit in Google Sheets <svg class="icon"><use href="#i-out"/></svg></a></div></article>
+        <article class="card breakdown-card"><div class="eyebrow">FOLLOW THE ENERGY</div><h2>Where it went</h2><p class="card-description">Your calories, by meal.</p><div id="mealBreakdown"></div></article>
+      </section>
+      <section class="bottom-grid">
+        <article id="planner" class="card planner-card section-anchor"><div class="card-header"><div><div class="eyebrow">A LITTLE FORESIGHT</div><h2>Meet your next meal.</h2></div><span class="subtle-pill green-pill"><svg class="icon small"><use href="#i-spark"/></svg>Meal lab</span></div><p class="card-description">Try a meal. See where your day could land.</p><div class="planner-options"><label>Start with<select id="plannerBase"><option value="day">The selected day's log</option><option value="fresh">A fresh day</option></select></label><label>Try a meal from your log<select id="plannerPreset"><option value="custom">Enter your own estimate</option></select></label></div><div class="planner-inputs"><label>Meal calories<div class="unit-input"><input type="number" id="planCalories" min="0" max="10000" step="1" value="500" inputmode="numeric"><span>kcal</span></div></label><label>Meal protein<div class="unit-input"><input type="number" id="planProtein" min="0" max="1000" step="0.1" value="30" inputmode="decimal"><span>g</span></div></label></div><div id="plannerResult" class="planner-result" role="status" aria-live="polite"></div><p class="planner-footnote"><svg class="icon"><use href="#i-info"/></svg>A what-if preview. Your food log stays as you entered it.</p></article>
+        <article id="progress" class="card weight-card section-anchor"><div class="card-header"><div><div class="eyebrow">PROGRESS HAS A LONGER HORIZON</div><h2>Your weight journey</h2></div><button class="icon-button" data-action="settings" title="Edit weight goal" aria-label="Edit weight goal"><svg class="icon"><use href="#i-settings"/></svg></button></div><div id="weightBody"></div><a class="weight-log-link sheet-link" target="_blank" rel="noopener noreferrer">Add a weigh-in to your Sheet <svg class="icon"><use href="#i-arrow"/></svg></a></article>
+      </section>
+      <aside class="coverage-strip"><span class="coverage-icon"><svg class="icon"><use href="#i-leaf"/></svg></span><div><strong>A fuller picture starts with a fuller log.</strong><p>Fiber, sodium, iron and vitamin D aren’t recorded in this Sheet yet.</p></div><button class="text-button" data-action="about">About your data <svg class="icon"><use href="#i-arrow"/></svg></button></aside>
+      <footer class="page-footer"><span><strong>nouri.</strong> A little better, every day.</span><span>Made for Vamsi · Syncs every 15 minutes <span class="footer-leaf">✳</span></span></footer>
+    </main>
   </div>
-</div>
-
-<div class="card">
-  <h2>Macros (P / C / F)</h2>
-  <div class="day-picker" id="dayPicker"></div>
-  <div style="position:relative;max-width:320px;margin:0 auto;"><canvas id="macroChart"></canvas></div>
-  <div id="macroTotals" style="text-align:center;margin-top:8px;font-size:0.9rem;color:var(--muted);"></div>
-</div>
-
-<div class="card">
-  <h2>Weight trend</h2>
-  <div style="position:relative;"><canvas id="weightChart"></canvas></div>
-</div>
-
-<footer>Auto-refreshes every 15 min · Data from Google Sheet</footer>
-
-<script>
-const SHEET_ID = "1qLlbE0ehY8bNAJ-ocmxHFhRSFdZ-l9j27B6-zZXU0es";
-const GOAL_KG = 80;
-const DEFAULT_TARGET = [2100, 2300];
-const TZ = "America/New_York";
-
-let charts = {};
-
-function todayStr() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: TZ }); // yyyy-mm-dd
-}
-function fmtDate(iso) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-function cell(row, i) {
-  const c = row.c[i];
-  if (!c) return null;
-  return c.f !== undefined && c.f !== null && c.f !== "" ? c.f : c.v;
-}
-function num(v) {
-  if (v === null || v === undefined || v === "") return null;
-  const n = parseFloat(String(v).replace(/,/g, ""));
-  return isNaN(n) ? null : n;
-}
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-}
-
-async function gviz(sheet) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(sheet)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Sheet fetch failed (" + res.status + ")");
-  const text = await res.text();
-  const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
-  if (json.status !== "ok") throw new Error("Sheet query error");
-  return json.table;
-}
-
-function parseMeals(table) {
-  const out = [];
-  for (const row of table.rows || []) {
-    const dateRaw = cell(row, 0);
-    if (!dateRaw) continue;
-    let date = String(dateRaw);
-    const m = date.match(/Date\((\d+),(\d+),(\d+)\)/);
-    if (m) date = `${m[1]}-${String(+m[2] + 1).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    out.push({
-      date,
-      meal: cell(row, 1) || "Meal",
-      time: cell(row, 2) || "",
-      items: cell(row, 3) || "",
-      kcal: num(cell(row, 4)),
-      protein: num(cell(row, 5)),
-      carbs: num(cell(row, 6)),
-      fat: num(cell(row, 7)),
-      photo: String(cell(row, 8) || "").toLowerCase() === "yes",
-      notes: cell(row, 9) || ""
-    });
-  }
-  return out;
-}
-
-function parseDaily(table) {
-  const out = [];
-  for (const row of table.rows || []) {
-    const date = cell(row, 0);
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) continue;
-    out.push({
-      date: String(date),
-      kcal: num(cell(row, 1)),
-      target: cell(row, 2) || "2100-2300",
-      status: cell(row, 3) || "",
-      weight: num(cell(row, 4)),
-      notes: cell(row, 5) || ""
-    });
-  }
-  out.sort((a, b) => a.date.localeCompare(b.date));
-  return out;
-}
-
-function parseTarget(s) {
-  const m = String(s || "").match(/(\d+)\s*[-–]\s*(\d+)/);
-  return m ? [+m[1], +m[2]] : DEFAULT_TARGET.slice();
-}
-
-function destroyChart(id) {
-  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-}
-
-function renderWeight(daily) {
-  const body = document.getElementById("weightBody");
-  const weighed = daily.filter(d => d.weight != null);
-  if (!weighed.length) { body.innerHTML = '<div class="empty">No weight logged yet.</div>'; return; }
-  const latest = weighed[weighed.length - 1];
-  const baseline = weighed[0].weight;
-  const toGo = Math.max(0, latest.weight - GOAL_KG);
-  const pct = baseline > GOAL_KG ? Math.min(100, Math.max(0, (baseline - latest.weight) / (baseline - GOAL_KG) * 100)) : 0;
-  body.innerHTML = `
-    <div class="weight-big">${latest.weight} kg</div>
-    <div class="weight-sub">Goal: ${GOAL_KG} kg · <strong style="color:var(--text)">${toGo.toFixed(1)} kg to go</strong> · weighed ${fmtDate(latest.date)}</div>
-    <div class="progress"><div style="width:${pct.toFixed(1)}%"></div></div>`;
-
-  // trend chart
-  destroyChart("weightChart");
-  const labels = weighed.map(d => fmtDate(d.date));
-  const data = weighed.map(d => d.weight);
-  if (window.Chart) {
-    charts.weightChart = new Chart(document.getElementById("weightChart"), {
-      type: "line",
-      data: { labels, datasets: [
-        { label: "Weight (kg)", data, borderColor: "#5aa9e6", backgroundColor: "rgba(90,169,230,.15)", fill: true, tension: 0.3, pointRadius: 4 },
-        { label: "Goal", data: labels.map(() => GOAL_KG), borderColor: "#4caf7d", borderDash: [6, 4], pointRadius: 0, fill: false }
-      ]},
-      options: { plugins: { legend: { labels: { color: "#8b98a9", boxWidth: 12 } } },
-        scales: { x: { ticks: { color: "#8b98a9" } }, y: { ticks: { color: "#8b98a9" } } } }
-    });
-  }
-}
-
-function renderMeals(meals) {
-  const body = document.getElementById("mealsBody");
-  const t = todayStr();
-  document.getElementById("todayDate").textContent = "· " + new Date().toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "short", day: "numeric" });
-  const todays = meals.filter(m => m.date === t);
-  if (!todays.length) {
-    const latest = meals.length ? meals[meals.length - 1].date : null;
-    body.innerHTML = `<div class="empty">No meals logged yet today.${latest ? ` Last logged: ${fmtDate(latest)}.` : ""}</div>`;
-    return;
-  }
-  body.innerHTML = todays.map(m => `
-    <div class="meal">
-      <div class="meal-head"><span class="meal-name">${esc(m.meal)}${m.photo ? " 📷" : ""}</span><span class="meal-time">${esc(m.time)}</span></div>
-      <div class="meal-items">${esc(m.items)}</div>
-      <div class="macros">
-        ${m.kcal != null ? `<span class="chip kcal">${m.kcal} kcal</span>` : ""}
-        ${m.protein != null ? `<span class="chip">P ${m.protein}g</span>` : ""}
-        ${m.carbs != null ? `<span class="chip">C ${m.carbs}g</span>` : ""}
-        ${m.fat != null ? `<span class="chip">F ${m.fat}g</span>` : ""}
-      </div>
-      ${m.notes ? `<div class="meal-notes">${esc(m.notes)}</div>` : ""}
-    </div>`).join("");
-}
-
-function renderCalChart(daily) {
-  destroyChart("calChart");
-  const recent = daily.slice(-14);
-  const labels = recent.map(d => fmtDate(d.date));
-  const kcal = recent.map(d => d.kcal);
-  const t0 = recent.length ? parseTarget(recent[recent.length - 1].target) : DEFAULT_TARGET;
-  const colors = recent.map(d => (d.status || "").toLowerCase() === "surplus" ? "#e0a83e" : "#4caf7d");
-  if (!window.Chart || !recent.length) return;
-  charts.calChart = new Chart(document.getElementById("calChart"), {
-    type: "bar",
-    data: { labels, datasets: [
-      { label: "kcal", data: kcal, backgroundColor: colors, borderRadius: 4 },
-      { label: "Target low", data: labels.map(() => t0[0]), type: "line", borderColor: "#e0a83e", borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 },
-      { label: "Target high", data: labels.map(() => t0[1]), type: "line", borderColor: "#e0a83e", borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 }
-    ]},
-    options: { plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: "#8b98a9" } }, y: { ticks: { color: "#8b98a9" }, beginAtZero: true } } }
-  });
-}
-
-let macroDay = null;
-function dailyMacros(meals) {
-  const byDay = {};
-  for (const m of meals) {
-    (byDay[m.date] = byDay[m.date] || { p: 0, c: 0, f: 0, kcal: 0, n: 0 });
-    if (m.protein != null) byDay[m.date].p += m.protein;
-    if (m.carbs != null) byDay[m.date].c += m.carbs;
-    if (m.fat != null) byDay[m.date].f += m.fat;
-    if (m.kcal != null) byDay[m.date].kcal += m.kcal;
-    byDay[m.date].n++;
-  }
-  return byDay;
-}
-
-function renderMacros(meals) {
-  const byDay = dailyMacros(meals);
-  const days = Object.keys(byDay).sort().slice(-7);
-  const picker = document.getElementById("dayPicker");
-  if (!days.length) {
-    picker.innerHTML = "";
-    document.getElementById("macroTotals").textContent = "No macro data yet.";
-    destroyChart("macroChart");
-    return;
-  }
-  if (!macroDay || !byDay[macroDay]) macroDay = days[days.length - 1];
-  picker.innerHTML = days.map(d =>
-    `<button class="day-btn${d === macroDay ? " active" : ""}" onclick="macroDay='${d}';renderMacros(window._meals)">${fmtDate(d)}</button>`).join("");
-  const t = byDay[macroDay];
-  document.getElementById("macroTotals").textContent =
-    `P ${Math.round(t.p)}g · C ${Math.round(t.c)}g · F ${Math.round(t.f)}g · ${Math.round(t.kcal)} kcal`;
-  destroyChart("macroChart");
-  if (window.Chart) {
-    charts.macroChart = new Chart(document.getElementById("macroChart"), {
-      type: "doughnut",
-      data: { labels: ["Protein", "Carbs", "Fat"],
-        datasets: [{ data: [t.p, t.c, t.f], backgroundColor: ["#5aa9e6", "#e0a83e", "#e05c5c"], borderWidth: 0 }] },
-      options: { plugins: { legend: { position: "bottom", labels: { color: "#8b98a9", boxWidth: 12 } } }, cutout: "60%" }
-    });
-  }
-}
-
-function showError(msg) {
-  document.getElementById("errorBanner").innerHTML =
-    `<div class="card error">⚠️ ${esc(msg)}<br><button class="refresh-btn" onclick="loadAll()">Try again</button></div>`;
-}
-function clearError() { document.getElementById("errorBanner").innerHTML = ""; }
-
-async function loadAll() {
-  clearError();
-  const btn = document.getElementById("refreshBtn");
-  btn.textContent = "⟳ …";
-  try {
-    const [mealsTable, dailyTable] = await Promise.all([gviz("Meals"), gviz("Daily summary")]);
-    const meals = parseMeals(mealsTable);
-    const daily = parseDaily(dailyTable);
-    window._meals = meals;
-    renderWeight(daily);
-    renderMeals(meals);
-    renderCalChart(daily);
-    renderMacros(meals);
-    const now = new Date().toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    document.getElementById("updatedAt").textContent = "Last updated: " + now + " ET";
-  } catch (e) {
-    console.error(e);
-    showError("Couldn't load the food log. Check your connection and try again.");
-    document.getElementById("updatedAt").textContent = "Last update failed — showing nothing cached.";
-  }
-  btn.textContent = "↻ Refresh";
-}
-
-loadAll();
-setInterval(loadAll, 15 * 60 * 1000);
-</script>
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle"><form id="settingsForm"><div class="dialog-header"><div><div class="eyebrow">MAKE IT YOURS</div><h2 id="settingsTitle">Your goals & preferences</h2></div><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close preferences"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="dialog-intro">These are planning targets, not a calculation of your personal requirements. Changes are saved in this browser.</p><label class="checkbox-field"><input type="checkbox" id="settingSheetTargets">Use the calorie range in my Google Sheet</label><p class="field-help">For dates without a range, the values below are the fallback.</p><div class="form-columns"><label>Lower calorie target (kcal)<input type="number" id="settingLow" min="1" max="20000" step="1" required></label><label>Upper calorie target (kcal)<input type="number" id="settingHigh" min="1" max="20000" step="1" required></label></div><div class="form-columns"><label>Protein target (g/day)<input type="number" id="settingProtein" min="1" max="1000" step="0.1" required></label><label>Weight goal (kg)<input type="number" id="settingWeight" min="20" max="500" step="0.1" required></label></div><div class="setting-callout"><strong>About the 128 g protein target</strong><p>It’s a provisional setting from the earlier dashboard plan (80 kg × 1.6). It hasn’t been established as your personal requirement. Choose the target you want to track.</p><label class="checkbox-field"><input id="settingReviewed" type="checkbox">I’ve reviewed this as my chosen protein target</label></div><label>Day boundary<select id="settingTimezone"><option value="America/New_York">Eastern Time · New York</option><option value="America/Chicago">Central Time · Chicago</option><option value="America/Denver">Mountain Time · Denver</option><option value="America/Los_Angeles">Pacific Time · Los Angeles</option><option value="Asia/Kolkata">India Standard Time · Kolkata</option><option value="UTC">UTC</option></select></label><p id="settingsError" class="form-error" role="alert"></p><div class="dialog-footer"><button type="button" id="resetSettings" class="text-button">Restore defaults</button><button type="submit" class="button button-primary">Save preferences <svg class="icon"><use href="#i-check"/></svg></button></div></form></dialog>
+  <dialog id="aboutDialog" aria-labelledby="aboutTitle"><div class="dialog-header"><div><div class="eyebrow">CLARITY INCLUDES THE DETAILS</div><h2 id="aboutTitle">How your dashboard works</h2></div><button class="icon-button" data-close="aboutDialog" aria-label="Close data information"><svg class="icon"><use href="#i-close"/></svg></button></div><div class="about-content"><h3>One log, one source of truth</h3><p>Your existing Google Sheet supplies the food and weight data. The dashboard refreshes every 15 minutes. A saved snapshot can keep the page useful when a connection fails; it is always labeled as saved data.</p><h3>What the numbers mean</h3><p>Calories are added from meal entries. The daily summary is used when meal calorie values are missing. Disagreements between those two totals are shown for review. “Above range” compares intake with your chosen target, not with calories your body burns.</p><p>Protein, carbs and fat are summed from the food log. Blank cells stay unknown. When a note explicitly says an add-on’s macros were counted in another meal, those macros aren’t counted twice. Macro energy uses 4 kcal/g for protein and carbs, and 9 kcal/g for fat; food estimates can differ.</p><h3>Targets are editable</h3><p>The original 2,100–2,300 kcal range and 80 kg weight goal are retained. Protein starts at a provisional 128 g. Carbs and fats stay flexible because you haven’t set targets for them. The <a href="https://www.niddk.nih.gov/health-information/weight-management/body-weight-planner" target="_blank" rel="noopener noreferrer">NIH Body Weight Planner</a> is a resource for exploring personalized calorie plans.</p><h3>Trends need observations</h3><p>Averages use logged days with the relevant values present. Empty calendar days are never counted as zero. Having all numeric fields filled doesn’t confirm that every meal was logged. One weigh-in establishes a starting point; this dashboard doesn’t invent a weight-loss forecast.</p><h3>What stays in your browser</h3><p>Your preferences and a recent data snapshot. This dashboard doesn’t add analytics trackers or send your log to an AI service. Log and edit actual meals through your Google Sheet.</p><h3>The rest of the picture</h3><p>This Sheet does not currently track fiber, sodium, iron, vitamin D, hydration, sleep or activity. No totals or health conclusions are inferred for those.</p></div><div class="dialog-footer"><button id="clearCache" class="text-button">Clear saved data snapshot</button><button class="button button-primary" data-close="aboutDialog">Got it</button></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><p class="noscript">JavaScript is needed to load this dashboard. <a href="https://docs.google.com/spreadsheets/d/1qLlbE0ehY8bNAJ-ocmxHFhRSFdZ-l9j27B6-zZXU0es/edit">Open your food log in Google Sheets</a>.</p></noscript>
 </body>
 </html>
